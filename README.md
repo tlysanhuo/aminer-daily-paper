@@ -100,7 +100,6 @@ These files are local runtime outputs and should stay out of git.
 
 - `SKILL.md` / `SKILL_zh.md`: OpenClaw skill contract
 - `scripts/`: trigger parsing, profile building, retrieval, summarization, rendering, dispatch
-- `tests/`: regression tests
 - `config.example.yaml`: safe example configuration
 - `.env.example`: optional environment variables for local overrides
 
@@ -127,15 +126,6 @@ Then invoke it in Feishu:
 ```text
 /aminer-rec5 topics: multimodal agents, tool use
 ```
-
-## Development
-
-```bash
-pip install -r requirements-dev.txt
-pytest -q
-```
-
-Note: there are currently a few pre-existing `research_profile` test failures in the original project logic. They are unrelated to the public packaging changes in this repo cut.
 
 ## Star History
 

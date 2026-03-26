@@ -100,7 +100,6 @@ python3 scripts/handle_trigger.py \
 
 - `SKILL.md` / `SKILL_zh.md`：OpenClaw skill 契约
 - `scripts/`：触发解析、画像构建、召回、摘要、渲染、派发
-- `tests/`：回归测试
 - `config.example.yaml`：安全版示例配置
 - `.env.example`：可选环境变量模板
 
@@ -127,15 +126,6 @@ cp -R ./aminer-rec ~/.openclaw/skills/aminer-rec5
 ```text
 /aminer-rec5 topics: 多模态智能体, tool use
 ```
-
-## 开发与测试
-
-```bash
-pip install -r requirements-dev.txt
-pytest -q
-```
-
-说明：当前项目原始实现里还存在几条 `research_profile` 相关的既有失败用例；这些不是这次“公开仓库整理”带出来的问题。
 
 ## Star History
 
