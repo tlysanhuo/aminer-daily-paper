@@ -46,11 +46,16 @@ pip install -r requirements.txt
 cp config.example.yaml config.yaml
 ```
 
-Replace the placeholder values in `config.yaml`:
+You can either fill `config.yaml` explicitly, or leave some fields empty and let the runtime discover them from local OpenClaw / environment settings.
 
 - `aminer.token`: your own AMiner token
 - `llm.api_key`: your OpenAI-compatible model key
 - `llm.base_url` and `llm.model`: the provider/model you want to use
+
+Recommended behavior:
+
+- leave `llm.api_key` / `llm.base_url` empty if your local OpenClaw already has a working model config
+- leave `aminer.token` empty if you prefer to provide `AMINER_TOKEN` from the environment
 
 `datacenter.segmentation_url` is optional. Leave it empty if you do not have access to an internal segmentation service; the pipeline will fall back to lighter local parsing.
 

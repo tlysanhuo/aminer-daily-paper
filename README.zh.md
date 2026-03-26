@@ -46,11 +46,16 @@ pip install -r requirements.txt
 cp config.example.yaml config.yaml
 ```
 
-把 `config.yaml` 里的占位符换成你自己的配置：
+你可以直接把 `config.yaml` 填完整，也可以把一部分字段留空，让运行时自动从本机 OpenClaw / 环境变量里兜底读取。
 
 - `aminer.token`：你自己的 AMiner token
 - `llm.api_key`：你自己的 OpenAI 兼容模型 key
 - `llm.base_url` / `llm.model`：你实际使用的模型服务
+
+推荐做法：
+
+- 如果你本机 OpenClaw 已经配好了模型，可以把 `llm.api_key` / `llm.base_url` 留空
+- 如果你更想走环境变量，可以把 `aminer.token` 留空，然后提供 `AMINER_TOKEN`
 
 `datacenter.segmentation_url` 是可选项。如果你没有内部分词/解析服务，直接留空即可，链路会退化到较轻量的本地解析逻辑。
 

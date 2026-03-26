@@ -1,7 +1,7 @@
 language: "zh"
 
 aminer:
-  token: "replace-with-your-aminer-token"
+  token: ""
 
 datacenter:
   segmentation_url: ""
@@ -13,9 +13,9 @@ search:
   top_k: 5
 
 llm:
-  api_key: "replace-with-your-openai-compatible-api-key"
-  base_url: "https://api.openai.com/v1"
-  model: "gpt-4.1-mini"
+  api_key: ""
+  base_url: ""
+  model: "gpt-5-mini"
   timeout_seconds: 45
   max_concurrent_requests: 10
   fallback:
