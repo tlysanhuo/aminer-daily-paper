@@ -137,6 +137,10 @@ pytest -q
 
 说明：当前项目原始实现里还存在几条 `research_profile` 相关的既有失败用例；这些不是这次“公开仓库整理”带出来的问题。
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=tlysanhuo/aminer-rec&type=Date)](https://www.star-history.com/#tlysanhuo/aminer-rec&Date)
+
 ## License
 
 [MIT](LICENSE)

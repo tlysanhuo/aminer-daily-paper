@@ -137,6 +137,10 @@ pytest -q
 
 Note: there are currently a few pre-existing `research_profile` test failures in the original project logic. They are unrelated to the public packaging changes in this repo cut.
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=tlysanhuo/aminer-rec&type=Date)](https://www.star-history.com/#tlysanhuo/aminer-rec&Date)
+
 ## License
 
 [MIT](LICENSE)
