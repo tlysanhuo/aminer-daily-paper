@@ -1,0 +1,25 @@
+language: "zh"
+
+aminer:
+  token: "replace-with-your-aminer-token"
+
+datacenter:
+  segmentation_url: ""
+  timeout_seconds: 15
+
+search:
+  lookback_days: 60
+  max_results: 120
+  top_k: 5
+
+llm:
+  api_key: "replace-with-your-openai-compatible-api-key"
+  base_url: "https://api.openai.com/v1"
+  model: "gpt-4.1-mini"
+  timeout_seconds: 45
+  max_concurrent_requests: 10
+  fallback:
+    api_key: ""
+    base_url: ""
+    model: ""
+    timeout_seconds: 45
