@@ -88,12 +88,87 @@ ORG_HINT_PATTERNS = (
 )
 
 
+MAX_TOPICS = 8
+MAX_TOPIC_LENGTH = 80
+MAX_PAPER_TITLES = 8
+MAX_PAPER_TITLE_LENGTH = 300
+MAX_SCHOLAR_NAME_LENGTH = 80
+MAX_SCHOLAR_ORG_LENGTH = 160
+MAX_FREE_TEXT_LENGTH = 600
+MAX_TARGET_LENGTH = 160
+MAX_ACCOUNT_ID_LENGTH = 64
+ALLOWED_PAPERS_FILE_SUFFIXES = {".json"}
+
+
 def _capture_field(command_body: str, field_name: str) -> str:
     labels = FIELD_LABELS[field_name]
     all_labels = [re.escape(label) for values in FIELD_LABELS.values() for label in values]
     pattern = rf"(?:{'|'.join(re.escape(label) for label in labels)})\s*[:：]\s*(.+?)(?=\s*(?:{'|'.join(all_labels)})\s*[:：]|$)"
     match = re.search(pattern, command_body, flags=re.IGNORECASE | re.S)
     return _clean_text(match.group(1)) if match else ""
+
+
+def _truncate_text(value: Any, max_length: int) -> str:
+    cleaned = _clean_text(value)
+    if len(cleaned) <= max_length:
+        return cleaned
+    return cleaned[:max_length].strip()
+
+
+def _normalize_topics_for_interface(values: list[Any]) -> list[str]:
+    topics: list[str] = []
+    for value in list(values or []):
+        topic = _truncate_text(value, MAX_TOPIC_LENGTH)
+        if topic and topic not in topics:
+            topics.append(topic)
+        if len(topics) >= MAX_TOPICS:
+            break
+    return topics
+
+
+def _normalize_paper_titles_for_interface(values: list[Any]) -> list[str]:
+    paper_titles: list[str] = []
+    for value in list(values or []):
+        paper_title = _truncate_text(value, MAX_PAPER_TITLE_LENGTH)
+        if paper_title and paper_title not in paper_titles:
+            paper_titles.append(paper_title)
+        if len(paper_titles) >= MAX_PAPER_TITLES:
+            break
+    return paper_titles
+
+
+def _resolve_interface_papers_file(base_dir: Path, path_text: str) -> str:
+    cleaned = _clean_text(path_text)
+    if not cleaned:
+        return ""
+
+    candidate = Path(cleaned).expanduser()
+    resolved_base_dir = base_dir.resolve()
+    resolved_candidate = (resolved_base_dir / candidate).resolve() if not candidate.is_absolute() else candidate.resolve()
+    try:
+        resolved_candidate.relative_to(resolved_base_dir)
+    except ValueError as exc:
+        raise ValueError("papers_file_outside_base_dir") from exc
+
+    if resolved_candidate.suffix.lower() not in ALLOWED_PAPERS_FILE_SUFFIXES:
+        raise ValueError("unsupported_papers_file")
+    return str(resolved_candidate)
+
+
+def _normalize_interface_payload(parsed: dict[str, Any], *, base_dir: Path) -> dict[str, Any]:
+    normalized = dict(parsed)
+    raw_uid = _clean_text(parsed.get("raw_aminer_user_id"))
+    if raw_uid and not re.fullmatch(r"[0-9a-fA-F]{24}", raw_uid):
+        raise ValueError("invalid_aminer_user_id")
+
+    normalized["aminer_user_id"] = _clean_text(parsed.get("aminer_user_id"))
+    normalized["topics"] = _normalize_topics_for_interface(list(parsed.get("topics") or []))
+    normalized["scholar_name"] = _truncate_text(parsed.get("scholar_name"), MAX_SCHOLAR_NAME_LENGTH)
+    normalized["scholar_org"] = _truncate_text(parsed.get("scholar_org"), MAX_SCHOLAR_ORG_LENGTH)
+    normalized["paper_titles"] = _normalize_paper_titles_for_interface(list(parsed.get("paper_titles") or []))
+    normalized["papers_file"] = _resolve_interface_papers_file(base_dir, str(parsed.get("papers_file") or ""))
+    normalized["free_text"] = _truncate_text(parsed.get("free_text"), MAX_FREE_TEXT_LENGTH)
+    return normalized
 
 
 def _strip_explicit_fields(command_body: str) -> str:
@@ -174,6 +249,7 @@ def parse_trigger_text(text: str) -> dict[str, Any]:
     return {
         "raw_text": raw_text,
         "command_text": command_text,
+        "raw_aminer_user_id": _capture_field(body, "aminer_user_id"),
         "aminer_user_id": uid,
         "topics": _split_topics(_capture_field(body, "topics")),
         "scholar_name": scholar_name,
@@ -484,9 +560,27 @@ def handle_trigger(
     config_path: Path | None = None,
 ) -> dict[str, Any]:
     parsed = parse_trigger_text(text)
+    try:
+        parsed = _normalize_interface_payload(parsed, base_dir=base_dir)
+    except ValueError as exc:
+        detail = _clean_text(str(exc))
+        if detail == "invalid_aminer_user_id":
+            reply_text = "输入里的 `aminer_user_id` 不合法。请提供 24 位十六进制字符串，例如：`/aminer-rec5 aminer_user_id: 696259801cb939bc391d3a37 topics: 多模态, 智能体`。"
+        elif detail == "papers_file_outside_base_dir":
+            reply_text = "出于安全限制，`papers_file` 只能指向当前 skill 目录内的 JSON 文件，不能引用目录外路径。"
+        elif detail == "unsupported_papers_file":
+            reply_text = "`papers_file` 目前只支持 `.json` 文件。"
+        else:
+            reply_text = f"输入不符合接口约束：{detail}"
+        return {
+            "status": "success",
+            "mode": "invalid_input",
+            "final_response": "TEXT",
+            "reply_text": reply_text,
+        }
     inferred_route = infer_delivery_route(text)
-    resolved_target = _clean_text(target) or inferred_route["target"]
-    resolved_account_id = _clean_text(account_id) or inferred_route["account_id"] or "default"
+    resolved_target = _truncate_text(_clean_text(target) or inferred_route["target"], MAX_TARGET_LENGTH)
+    resolved_account_id = _truncate_text(_clean_text(account_id) or inferred_route["account_id"] or "default", MAX_ACCOUNT_ID_LENGTH) or "default"
     has_profile_input = bool(
         parsed["aminer_user_id"]
         or parsed["topics"]

@@ -82,6 +82,27 @@ python3 scripts/handle_trigger.py \
 /aminer-rec5 aminer_user_id: 696259801cb939bc391d3a37 topics: multimodal, tool use
 ```
 
+## Interface Contract
+
+The public repo exposes exactly one supported external entrypoint:
+
+```bash
+python3 scripts/handle_trigger.py --base-dir . --text "<message>"
+```
+
+Everything else under `scripts/` is internal implementation detail and may change without compatibility guarantees.
+
+Input guardrails at the entrypoint:
+
+- `aminer_user_id` must be a 24-character hex string
+- `topics`: up to 8 items, 80 characters each
+- `paper_titles`: up to 8 items, 300 characters each
+- `scholar_name`: up to 80 characters
+- `scholar_org`: up to 160 characters
+- `free_text`: up to 600 characters
+- `papers_file`: JSON only, and must stay inside the current skill directory
+- delivery routing fields are truncated to safe lengths before dispatch
+
 ## Outputs
 
 Runtime artifacts are written to `outputs/`:
@@ -99,7 +120,8 @@ These files are local runtime outputs and should stay out of git.
 ## Repository Layout
 
 - `SKILL.md` / `SKILL_zh.md`: OpenClaw skill contract
-- `scripts/`: trigger parsing, profile building, retrieval, summarization, rendering, dispatch
+- `scripts/handle_trigger.py`: the only supported external interface
+- `scripts/`: internal implementation for parsing, profile building, retrieval, summarization, rendering, and dispatch
 - `config.example.yaml`: safe example configuration
 - `.env.example`: optional environment variables for local overrides
 

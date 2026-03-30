@@ -82,6 +82,27 @@ python3 scripts/handle_trigger.py \
 /aminer-rec5 aminer_user_id: 696259801cb939bc391d3a37 topics: 多模态, tool use
 ```
 
+## 接口约束
+
+这个公开仓库对外只支持一个入口：
+
+```bash
+python3 scripts/handle_trigger.py --base-dir . --text "<message>"
+```
+
+`scripts/` 目录里的其它模块都属于内部实现细节，不承诺对外兼容。
+
+入口层现在会做这些限制：
+
+- `aminer_user_id` 必须是 24 位十六进制字符串
+- `topics` 最多 8 个，每个最多 80 个字符
+- `paper_titles` 最多 8 个，每个最多 300 个字符
+- `scholar_name` 最多 80 个字符
+- `scholar_org` 最多 160 个字符
+- `free_text` 最多 600 个字符
+- `papers_file` 只允许 `.json`，而且路径必须在当前 skill 目录内
+- 派发用的路由字段会先截断到安全长度再使用
+
 ## 输出产物
 
 运行后会在 `outputs/` 下生成：
@@ -99,7 +120,8 @@ python3 scripts/handle_trigger.py \
 ## 仓库结构
 
 - `SKILL.md` / `SKILL_zh.md`：OpenClaw skill 契约
-- `scripts/`：触发解析、画像构建、召回、摘要、渲染、派发
+- `scripts/handle_trigger.py`：唯一受支持的对外入口
+- `scripts/`：内部实现，包括触发解析、画像构建、召回、摘要、渲染、派发
 - `config.example.yaml`：安全版示例配置
 - `.env.example`：可选环境变量模板
 
