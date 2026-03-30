@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/tlysanhuo/aminer-rec/schemas/recommend_and_dispatch.request.schema.json",
+  "title": "RecommendAndDispatchRequest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["request_context", "route", "profile_input"],
+  "properties": {
+    "request_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["skill_name", "channel", "language", "command_text"],
+      "properties": {
+        "skill_name": { "type": "string", "const": "aminer-rec5" },
+        "channel": { "type": "string", "const": "openclaw" },
+        "language": { "type": "string", "minLength": 1, "maxLength": 16 },
+        "command_text": { "type": "string", "minLength": 1, "maxLength": 2000 }
+      }
+    },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target", "account_id"],
+      "properties": {
+        "target": { "type": "string", "maxLength": 160 },
+        "account_id": { "type": "string", "minLength": 1, "maxLength": 64 }
+      }
+    },
+    "profile_input": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "aminer_user_id": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{24}$",
+          "maxLength": 24
+        },
+        "topics": {
+          "type": "array",
+          "maxItems": 8,
+          "items": { "type": "string", "minLength": 1, "maxLength": 80 }
+        },
+        "scholar_name": { "type": "string", "maxLength": 80 },
+        "scholar_org": { "type": "string", "maxLength": 160 },
+        "paper_titles": {
+          "type": "array",
+          "maxItems": 8,
+          "items": { "type": "string", "minLength": 1, "maxLength": 300 }
+        },
+        "seed_papers": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "title": { "type": "string", "maxLength": 300 },
+              "abstract": { "type": "string", "maxLength": 4000 },
+              "year": { "type": "integer", "minimum": 1900, "maximum": 2100 },
+              "venue": { "type": "string", "maxLength": 200 },
+              "authors": {
+                "type": "array",
+                "maxItems": 20,
+                "items": { "type": "string", "minLength": 1, "maxLength": 80 }
+              },
+              "url": { "type": "string", "maxLength": 500 },
+              "paper_id": { "type": "string", "maxLength": 128 }
+            },
+            "anyOf": [
+              { "required": ["title"] },
+              { "required": ["abstract"] }
+            ]
+          }
+        },
+        "free_text": { "type": "string", "maxLength": 600 }
+      }
+    }
+  }
+}

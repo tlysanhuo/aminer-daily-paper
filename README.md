@@ -1,34 +1,35 @@
 # aminer-rec
 
-Public repository for the `aminer-rec5` OpenClaw / Feishu paper recommendation skill, with two smooth entry points:
+Public repository for the `aminer-rec5` OpenClaw / Feishu paper recommendation skill client.
 
-- scholar bootstrap: start from `aminer_user_id`, `scholar + org`, representative papers, or a local `papers_file`
-- topic bootstrap: start from `topics` or free-form natural language such as "I work on multimodal agents and tool use"
+This repo is no longer positioned as the full recommendation pipeline. Its job is intentionally narrow:
 
-The repository turns both paths into one unified `ResearchProfile`, then runs retrieval, AMiner enrichment, summarization, card rendering, and delivery.
+- parse `/aminer-rec5 ...` messages
+- validate a constrained public input contract
+- resolve Feishu delivery route metadata
+- call a configured backend recommendation API
+- return the backend response contract
 
 The OpenClaw command name remains `/aminer-rec5`.
 
 ## Why This Version Exists
 
-This is the public-shareable repo cut of `aminer-rec5`:
+This is the public-shareable client cut of `aminer-rec5`:
 
 - secrets removed
 - local output artifacts removed
-- hard-coded machine paths replaced with portable defaults
+- interface surface narrowed to one entrypoint plus backend API schemas
 - README and setup flow rewritten for external users
 
 If you want to post this on social platforms and drive traffic to a personal GitHub repo, this version is the one to publish.
 
 ## Highlights
 
-- Natural-language-first paper recommendation
-- Scholar-aware cold start from AMiner person signals
-- Unified topic and scholar profile building
-- arXiv retrieval plus AMiner enrich
-- Structured summaries and recommendation reasons
-- Feishu / OpenClaw-friendly output format
-- Graceful degradation when optional internal components are unavailable
+- Thin OpenClaw skill client instead of a full exposed pipeline
+- Strict parameter guardrails at the public entrypoint
+- Backend-first architecture for profile building, retrieval, ranking, and dispatch
+- JSON Schema files for the minimal request and response contract
+- Feishu / OpenClaw-friendly route forwarding
 
 ## Quick Start
 
@@ -46,18 +47,12 @@ pip install -r requirements.txt
 cp config.example.yaml config.yaml
 ```
 
-You can either fill `config.yaml` explicitly, or leave some fields empty and let the runtime discover them from local OpenClaw / environment settings.
+Set the backend your skill client should call:
 
-- `aminer.token`: your own AMiner token
-- `llm.api_key`: your OpenAI-compatible model key
-- `llm.base_url` and `llm.model`: the provider/model you want to use
-
-Recommended behavior:
-
-- leave `llm.api_key` / `llm.base_url` empty if your local OpenClaw already has a working model config
-- leave `aminer.token` empty if you prefer to provide `AMINER_TOKEN` from the environment
-
-`datacenter.segmentation_url` is optional. Leave it empty if you do not have access to an internal segmentation service; the pipeline will fall back to lighter local parsing.
+- `backend.base_url`: your recommendation backend base URL
+- `backend.recommend_path`: endpoint path, default `/v1/recommend-and-dispatch`
+- `backend.api_key`: optional bearer token
+- `backend.timeout_seconds`: HTTP timeout for the backend call
 
 ### 3. Run a local check
 
@@ -100,40 +95,40 @@ Input guardrails at the entrypoint:
 - `scholar_name`: up to 80 characters
 - `scholar_org`: up to 160 characters
 - `free_text`: up to 600 characters
-- `papers_file`: JSON only, and must stay inside the current skill directory
+- `papers_file`: JSON only, must stay inside the current skill directory, and is converted into inline `seed_papers` before calling the backend
 - delivery routing fields are truncated to safe lengths before dispatch
 
-## Outputs
+Minimal backend protocol:
 
-Runtime artifacts are written to `outputs/`:
+- Request schema: [`schemas/recommend_and_dispatch.request.schema.json`](/Users/tly/work/aminer-rec5-public/schemas/recommend_and_dispatch.request.schema.json)
+- Response schema: [`schemas/recommend_and_dispatch.response.schema.json`](/Users/tly/work/aminer-rec5-public/schemas/recommend_and_dispatch.response.schema.json)
 
-- `request_context.json`
-- `runtime_config.yaml`
-- `user_profile.json`
-- `arxiv_candidates.json`
-- `papers_ranked.json`
-- `papers_summarized.json`
-- `feishu_messages.json`
+Recommended backend behavior:
 
-These files are local runtime outputs and should stay out of git.
+- accept one normalized request from the skill client
+- do profile resolution, retrieval, ranking, summarization, and optional dispatch on the backend side
+- return `NO_REPLY` when the backend has already dispatched to Feishu
+- return `TEXT` plus `reply_text` when the client should surface a user-visible fallback
 
 ## Repository Layout
 
 - `SKILL.md` / `SKILL_zh.md`: OpenClaw skill contract
 - `scripts/handle_trigger.py`: the only supported external interface
-- `scripts/`: internal implementation for parsing, profile building, retrieval, summarization, rendering, and dispatch
-- `config.example.yaml`: safe example configuration
-- `.env.example`: optional environment variables for local overrides
+- `schemas/`: minimal backend request / response schemas
+- `config.example.yaml`: backend client configuration example
+- `scripts/`: internal or legacy implementation details, not public API
 
-## Optional Internal Hooks
+## Backend Config
 
-This public repo keeps a few optional extension points for internal environments:
+You can configure the backend with `config.yaml` or environment variables:
 
-- `DATACENTER_SEGMENTATION_URL`: enables better query segmentation if you have that service
-- `RECSYS_NEXT_DIR`: enables internal UID profile lookup if you have the private dependency tree
-- `OPENCLAW_HOME`, `OPENCLAW_CONFIG_PATH`, `OPENCLAW_SESSIONS_PATH`: override local OpenClaw locations
+- `AMINER_REC_BACKEND_BASE_URL`
+- `AMINER_REC_BACKEND_PATH`
+- `AMINER_REC_BACKEND_API_KEY`
+- `AMINER_REC_BACKEND_TIMEOUT_SECONDS`
+- `AMINER_REC_LANGUAGE`
 
-Without them, the public version still runs, but some scholar-boost and routing features will degrade gracefully.
+`OPENCLAW_HOME` and `OPENCLAW_SESSIONS_PATH` are still respected for local route inference.
 
 ## OpenClaw Install
 

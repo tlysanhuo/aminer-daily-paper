@@ -1,2 +1,1 @@
-openai>=1.30.0
 PyYAML>=6.0

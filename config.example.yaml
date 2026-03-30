@@ -1,25 +1,7 @@
 language: "zh"
 
-aminer:
-  token: ""
-
-datacenter:
-  segmentation_url: ""
-  timeout_seconds: 15
-
-search:
-  lookback_days: 60
-  max_results: 120
-  top_k: 5
-
-llm:
-  api_key: ""
+backend:
   base_url: ""
-  model: "gpt-5-mini"
-  timeout_seconds: 45
-  max_concurrent_requests: 10
-  fallback:
-    api_key: ""
-    base_url: ""
-    model: ""
-    timeout_seconds: 45
+  recommend_path: "/v1/recommend-and-dispatch"
+  api_key: ""
+  timeout_seconds: 30
