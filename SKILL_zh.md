@@ -14,9 +14,12 @@ metadata: { "openclaw": { "emoji": "📚", "requires": { "bins": ["python3"] } }
 ## Slash 命令契约
 
 - 每次显式调用都必须重新执行，不复用旧 outputs。
-- 不要只回复状态、诊断或“要不要重跑”。
+- 不要只回复状态、诊断或"要不要重跑"。
 - 不要搜索、安装、升级或修复 skill。
-- 成功发送后，只返回 `NO_REPLY`。
+- 运行 `handle_trigger.py` 后检查 `final_response`：
+  - `NO_REPLY` → 飞书卡片已发送，返回 `NO_REPLY`
+  - `TEXT` → 无飞书目标，直接将 `reply_text` 展示给用户
+  - 错误 → 报告 `reply_text` 或错误详情
 
 ## 输入
 
@@ -29,10 +32,15 @@ metadata: { "openclaw": { "emoji": "📚", "requires": { "bins": ["python3"] } }
 - topic 增强：
   - `topics`
   - 命令后的自然语言自由描述
+- 过滤参数：
+  - `language_sort`：`zh` 或 `en`，按论文语言过滤
+  - `start_year`：起始年份（如 2023）
+  - `end_year`：截止年份（如 2026）
 
 示例：
 
 - `/aminer-rec5 topics: 多模态, 智能体`
+- `/aminer-rec5 topics: LLM reasoning language_sort: en start_year: 2024`
 - `/aminer-rec5 scholar: Jie Tang org: Tsinghua papers: OAG-Bench | RPC-Bench`
 - `/aminer-rec5 aminer_user_id: 696259801cb939bc391d3a37 topics: 多模态, tool-use`
 - `/aminer-rec5 我做多模态智能体和 tool-use，帮我推荐最近论文`

@@ -16,7 +16,10 @@ Use this skill only for explicit `/aminer-rec5` or `/skill aminer-rec5` requests
 - Every explicit invocation is a new run.
 - Do not answer with status-only text.
 - Do not search, install, or repair skills.
-- After a successful dispatch, return exactly `NO_REPLY`.
+- After running `handle_trigger.py`, check `final_response` in the JSON output:
+  - `NO_REPLY` → Feishu cards were dispatched successfully. Return exactly `NO_REPLY`.
+  - `TEXT` → No Feishu target available. Present the `reply_text` value directly to the user.
+  - Any error → Report the `reply_text` or error detail to the user.
 
 ## Inputs
 
@@ -26,6 +29,9 @@ Use this skill only for explicit `/aminer-rec5` or `/skill aminer-rec5` requests
 - `papers`
 - `papers_file`
 - `topics`
+- `language_sort`: `zh` or `en` — filter results by paper language
+- `start_year`: minimum publication year (e.g. 2023)
+- `end_year`: maximum publication year (e.g. 2026)
 - free-form natural-language interest description
 
 ## Execution
@@ -37,3 +43,12 @@ python3 "{baseDir}/scripts/handle_trigger.py" \
 ```
 
 `handle_trigger.py` is the only supported entrypoint.
+
+## Examples
+
+```
+/aminer-rec5 topics: multimodal agents, tool use
+/aminer-rec5 topics: LLM reasoning language_sort: en start_year: 2024
+/aminer-rec5 scholar: Jie Tang org: Tsinghua University papers: OAG-Bench
+/aminer-rec5 aminer_user_id: 696259801cb939bc391d3a37 topics: multimodal
+```

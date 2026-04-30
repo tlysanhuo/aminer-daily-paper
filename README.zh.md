@@ -75,6 +75,10 @@ python3 scripts/handle_trigger.py \
 ```
 
 ```text
+/aminer-rec5 topics: LLM reasoning language_sort: en start_year: 2024
+```
+
+```text
 /aminer-rec5 scholar: Jie Tang org: Tsinghua University papers: OAG-Bench | RPC-Bench
 ```
 
@@ -101,6 +105,8 @@ python3 scripts/handle_trigger.py --base-dir . --text "<message>"
 - `scholar_org` 最多 160 个字符
 - `free_text` 最多 600 个字符
 - `papers_file` 只允许 `.json`，而且路径必须在当前 skill 目录内
+- `language_sort` 只允许 `zh` 或 `en`，按论文语言过滤结果
+- `start_year` / `end_year`：1900–2100 之间的整数，按发表年份过滤
 - 派发用的路由字段会先截断到安全长度再使用
 
 ## 输出产物

@@ -223,6 +223,95 @@ def _stage_error(stage: str, detail: Any) -> RuntimeError:
     return RuntimeError(f"{stage}_failed:{compact}")
 
 
+def _format_papers_as_markdown(papers: list[dict[str, Any]], profile_topics: list[str]) -> str:
+    lines: list[str] = []
+    topic_hint = " / ".join(profile_topics[:5]) if profile_topics else ""
+    header = f"为你推荐 {len(papers)} 篇相关论文"
+    if topic_hint:
+        header += f"（研究方向：{topic_hint}）"
+    lines.append(header)
+
+    for idx, paper in enumerate(papers, start=1):
+        lines.append("")
+        lines.append("---")
+        lines.append("")
+        title = _clean_text(paper.get("title") or "")
+        url = _clean_text(paper.get("aminer_paper_url") or paper.get("abs_url") or "")
+        title_line = f"**{idx}. [{title}]({url})**" if url else f"**{idx}. {title}**"
+        lines.append(title_line)
+
+        year = paper.get("year")
+        keywords = paper.get("keywords") or []
+        authors = paper.get("authors") or []
+        summary = _clean_text(paper.get("summary") or paper.get("abstract") or "")
+        meta_parts: list[str] = []
+        if year:
+            meta_parts.append(f"年份：{year}")
+        if keywords:
+            meta_parts.append(f"关键词：{' / '.join(str(k) for k in keywords[:5])}")
+        if meta_parts:
+            lines.append(" | ".join(meta_parts))
+        if authors:
+            author_str = "、".join(str(a) for a in authors[:6])
+            if len(authors) > 6:
+                author_str += " et al."
+            lines.append(f"作者：{author_str}")
+
+        reason = _clean_text(paper.get("recommendation_reason") or "")
+        if reason:
+            if len(reason) > 200:
+                reason = reason[:200].rstrip() + "…"
+            lines.append(f"推荐理由：{reason}")
+
+        if summary:
+            truncated = summary if len(summary) <= 300 else summary[:300].rstrip() + "…"
+            lines.append("")
+            lines.append(truncated)
+
+    return "\n".join(lines)
+
+
+def _apply_user_filters(ranked_payload: dict[str, Any], profile: dict[str, Any]) -> dict[str, Any]:
+    language_sort = _clean_text(profile.get("language_sort"))
+    start_year = int(profile.get("start_year") or 0)
+    end_year = int(profile.get("end_year") or 0)
+    if not language_sort and not start_year and not end_year:
+        return ranked_payload
+
+    def _paper_year(paper: dict[str, Any]) -> int:
+        for field in ("year", "published"):
+            val = str(paper.get(field) or "").strip()[:4]
+            try:
+                return int(val)
+            except (ValueError, TypeError):
+                continue
+        return 0
+
+    def _paper_matches(paper: dict[str, Any]) -> bool:
+        if start_year > 0 or end_year > 0:
+            py = _paper_year(paper)
+            if py and start_year > 0 and py < start_year:
+                return False
+            if py and end_year > 0 and py > end_year:
+                return False
+        if language_sort == "en":
+            title = str(paper.get("title") or "")
+            if re.search(r"[\u4e00-\u9fff]", title):
+                return False
+        if language_sort == "zh":
+            title = str(paper.get("title") or "")
+            abstract = str(paper.get("abstract") or paper.get("summary") or "")
+            if not re.search(r"[\u4e00-\u9fff]", title + abstract):
+                return False
+        return True
+
+    filtered: dict[str, Any] = dict(ranked_payload)
+    for key in ("papers", "ranked_candidates"):
+        items = list(ranked_payload.get(key) or [])
+        filtered[key] = [p for p in items if _paper_matches(p)]
+    return filtered
+
+
 def _first_non_success_reason(payload: dict[str, Any], *, status_key: str, reason_key: str, fallback: str) -> str:
     for paper in list(payload.get("papers") or []):
         if str(paper.get(status_key, "success")).strip() == "success":
@@ -682,8 +771,11 @@ def run_pipeline(
     paper_titles: list[str],
     papers_file: str,
     free_text: str,
-    target: str,
-    account_id: str,
+    language_sort: str = "",
+    start_year: int = 0,
+    end_year: int = 0,
+    target: str = "",
+    account_id: str = "main",
     skip_dispatch: bool = False,
 ) -> dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -719,6 +811,14 @@ def run_pipeline(
     if profile.get("status") != "success":
         raise _stage_error("profile", profile.get("source_metadata", {}).get("reason") or "profile_unavailable")
 
+    # Inject user-specified language and year preferences into profile
+    if language_sort:
+        profile["language_sort"] = language_sort
+    if start_year > 0:
+        profile["start_year"] = start_year
+    if end_year > 0:
+        profile["end_year"] = end_year
+
     try:
         candidate_payload = _fetch_candidates_by_strategy(profile, config=config)
     except Exception as exc:
@@ -740,6 +840,10 @@ def run_pipeline(
     ranked_payload["recall_strategy"] = dict(profile.get("recall_strategy") or {})
     ranked_payload["recall_plan"] = list(candidate_payload.get("recall_plan") or [])
     ranked_payload["recall_errors"] = list(candidate_payload.get("errors") or [])
+
+    # Apply language_sort and year filters from user input
+    ranked_payload = _apply_user_filters(ranked_payload, profile)
+
     try:
         ranked_payload = enrich_ranked_payload_with_aminer_paper_urls(ranked_payload, config=config)
         ranked_payload = enrich_ranked_payload_with_aminer_details(
@@ -842,6 +946,28 @@ def run_pipeline(
                 fallback=str(summarized_payload.get("status") or "summary_unavailable"),
             ),
         )
+    # Non-Feishu channels: skip card dispatch and return Markdown text instead
+    has_feishu_target = bool(target.strip()) and not skip_dispatch
+
+    if not has_feishu_target:
+        markdown_text = _format_papers_as_markdown(
+            list(summarized_payload.get("papers") or []),
+            list(profile.get("topics") or profile.get("retrieval_topics") or []),
+        )
+        return {
+            "status": "success",
+            "profile_path": str(profile_path),
+            "candidates_path": str(candidates_path),
+            "ranked_path": str(ranked_path),
+            "summarized_path": str(summarized_path),
+            "final_response": "TEXT",
+            "reply_text": markdown_text,
+            "mode": str(profile.get("profile_mode") or ("scholar_path" if _clean_text(aminer_user_id) else "topic_path")),
+            "is_cs_user": bool(profile.get("is_cs_user")),
+            "recall_primary_source": str(profile.get("recall_primary_source") or ""),
+            "recall_secondary_source": str(profile.get("recall_secondary_source") or ""),
+        }
+
     try:
         _run_python(
             script_dir / "render_feishu_messages.py",
@@ -885,6 +1011,9 @@ def main() -> int:
     parser.add_argument("--paper-title", action="append", dest="paper_titles", default=[])
     parser.add_argument("--papers-file", default="")
     parser.add_argument("--free-text", default="")
+    parser.add_argument("--language-sort", default="")
+    parser.add_argument("--start-year", type=int, default=0)
+    parser.add_argument("--end-year", type=int, default=0)
     parser.add_argument("--target", default="")
     parser.add_argument("--account", default="main")
     parser.add_argument("--skip-dispatch", action="store_true")
@@ -904,6 +1033,9 @@ def main() -> int:
         paper_titles=list(args.paper_titles or []),
         papers_file=args.papers_file,
         free_text=args.free_text,
+        language_sort=args.language_sort,
+        start_year=args.start_year,
+        end_year=args.end_year,
         target=args.target,
         account_id=args.account,
         skip_dispatch=args.skip_dispatch,

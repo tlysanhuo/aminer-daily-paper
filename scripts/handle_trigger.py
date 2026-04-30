@@ -59,6 +59,9 @@ FIELD_LABELS = {
     "scholar_org": ["org", "organization", "affiliation", "机构", "单位"],
     "paper_titles": ["paper", "papers", "代表作", "论文"],
     "papers_file": ["papers_file", "source_file", "profile_file", "文件", "路径"],
+    "language_sort": ["language_sort", "语言"],
+    "start_year": ["start_year", "from_year", "起始年份"],
+    "end_year": ["end_year", "to_year", "截止年份"],
 }
 
 
@@ -95,6 +98,7 @@ MAX_PAPER_TITLE_LENGTH = 300
 MAX_SCHOLAR_NAME_LENGTH = 80
 MAX_SCHOLAR_ORG_LENGTH = 160
 MAX_FREE_TEXT_LENGTH = 600
+MAX_LANGUAGE_SORT_LENGTH = 4
 MAX_TARGET_LENGTH = 160
 MAX_ACCOUNT_ID_LENGTH = 64
 ALLOWED_PAPERS_FILE_SUFFIXES = {".json"}
@@ -168,6 +172,18 @@ def _normalize_interface_payload(parsed: dict[str, Any], *, base_dir: Path) -> d
     normalized["paper_titles"] = _normalize_paper_titles_for_interface(list(parsed.get("paper_titles") or []))
     normalized["papers_file"] = _resolve_interface_papers_file(base_dir, str(parsed.get("papers_file") or ""))
     normalized["free_text"] = _truncate_text(parsed.get("free_text"), MAX_FREE_TEXT_LENGTH)
+    raw_lang = _truncate_text(parsed.get("language_sort"), MAX_LANGUAGE_SORT_LENGTH)
+    normalized["language_sort"] = raw_lang if raw_lang in {"zh", "en"} else ""
+    raw_start = _clean_text(parsed.get("start_year"))
+    raw_end = _clean_text(parsed.get("end_year"))
+    try:
+        normalized["start_year"] = int(raw_start) if raw_start and 1900 <= int(raw_start) <= 2100 else 0
+    except (ValueError, TypeError):
+        normalized["start_year"] = 0
+    try:
+        normalized["end_year"] = int(raw_end) if raw_end and 1900 <= int(raw_end) <= 2100 else 0
+    except (ValueError, TypeError):
+        normalized["end_year"] = 0
     return normalized
 
 
@@ -257,6 +273,9 @@ def parse_trigger_text(text: str) -> dict[str, Any]:
         "paper_titles": _split_papers(_capture_field(body, "paper_titles")),
         "papers_file": _capture_field(body, "papers_file"),
         "free_text": free_text,
+        "language_sort": _clean_text(_capture_field(body, "language_sort")),
+        "start_year": _clean_text(_capture_field(body, "start_year")),
+        "end_year": _clean_text(_capture_field(body, "end_year")),
         "is_trigger": bool(re.search(r"^/(skill\s+)?aminer[-_]rec5\b", normalized, flags=re.IGNORECASE)),
     }
 
@@ -456,6 +475,9 @@ def _run_pipeline(
     paper_titles: list[str],
     papers_file: str,
     free_text: str,
+    language_sort: str,
+    start_year: int,
+    end_year: int,
     target: str,
     account_id: str,
 ) -> dict[str, Any]:
@@ -488,6 +510,12 @@ def _run_pipeline(
         command.extend(["--papers-file", papers_file.strip()])
     if free_text.strip():
         command.extend(["--free-text", free_text.strip()])
+    if language_sort.strip():
+        command.extend(["--language-sort", language_sort.strip()])
+    if start_year > 0:
+        command.extend(["--start-year", str(start_year)])
+    if end_year > 0:
+        command.extend(["--end-year", str(end_year)])
     completed = subprocess.run(command, capture_output=True, text=True, check=False)
     if completed.returncode != 0:
         detail = completed.stderr.strip() or completed.stdout.strip() or "run_pipeline failed"
@@ -631,6 +659,9 @@ def handle_trigger(
             paper_titles=parsed["paper_titles"],
             papers_file=parsed["papers_file"],
             free_text=parsed["free_text"],
+            language_sort=parsed["language_sort"],
+            start_year=parsed.get("start_year", 0),
+            end_year=parsed.get("end_year", 0),
             target=resolved_target,
             account_id=resolved_account_id,
         )
