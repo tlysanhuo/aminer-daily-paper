@@ -155,10 +155,6 @@ cp -R ./aminer-rec ~/.openclaw/skills/aminer-rec5
 /aminer-rec5 topics: 多模态智能体, tool use
 ```
 
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=tlysanhuo/aminer-rec&type=Date)](https://www.star-history.com/#tlysanhuo/aminer-rec&Date)
-
 ## License
 
 [MIT](LICENSE)

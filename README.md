@@ -155,10 +155,6 @@ Then invoke it in Feishu:
 /aminer-rec5 topics: multimodal agents, tool use
 ```
 
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=tlysanhuo/aminer-rec&type=Date)](https://www.star-history.com/#tlysanhuo/aminer-rec&Date)
-
 ## License
 
 [MIT](LICENSE)
