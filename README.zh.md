@@ -1,13 +1,13 @@
 # aminer-rec
 
-`aminer-rec5` 这个 OpenClaw / 飞书论文推荐 skill 的公开仓库版，支持两种非常顺手的输入方式：
+AMiner 个性化论文推荐流水线的公开仓库版，支持两种非常顺手的输入方式：
 
 - 学者启动：从 `aminer_user_id`、`scholar + org`、代表论文，或者本地 `papers_file` 出发
 - 主题启动：直接给 `topics`，或者一句自然语言，比如“我做多模态智能体和 tool use，帮我推荐最近论文”
 
-两条路径最终都会统一归纳成一个 `ResearchProfile`，再进入同一条推荐流水线：召回、AMiner enrich、摘要生成、卡片渲染和消息派发。
+两条路径最终都会统一归纳成一个 `ResearchProfile`，再进入同一条推荐流水线：召回、AMiner enrich、排序、摘要生成和本地输出。
 
-OpenClaw 里的实际命令名仍然是 `/aminer-rec5`。
+飞书 / OpenClaw 是可选集成。OpenClaw 里的实际命令名仍然是 `/aminer-rec5`。
 
 ## 这版适合公开发
 
@@ -27,7 +27,8 @@ OpenClaw 里的实际命令名仍然是 `/aminer-rec5`。
 - topic / scholar 双路径统一画像
 - `arXiv + AMiner enrich` 的组合式召回
 - 输出结构化摘要和推荐理由
-- 直接对接 Feishu / OpenClaw 使用场景
+- 独立 CLI 输出 Markdown / JSON
+- 可选对接 Feishu / OpenClaw 使用场景
 - 内部依赖不可用时可以优雅降级，不至于整个链路跑不起来
 
 ## 快速开始
@@ -59,16 +60,49 @@ cp config.example.yaml config.yaml
 
 `datacenter.segmentation_url` 是可选项。如果你没有内部分词/解析服务，直接留空即可，链路会退化到较轻量的本地解析逻辑。
 
-### 3. 本地跑一个 demo
+### 3. 运行独立 CLI
 
 ```bash
-python3 scripts/handle_trigger.py \
+python3 scripts/recommend.py \
   --base-dir . \
   --config config.yaml \
-  --text "/aminer-rec5 我做多模态智能体和 tool use，帮我推荐最近论文"
+  --topics "多模态智能体, tool use" \
+  --start-year 2024
+```
+
+这个 CLI 不需要飞书或 OpenClaw。默认会写出：
+
+- `outputs_cli/recommendation.md`
+- `outputs_cli/recommendation_result.json`
+- `user_profile.json`、`papers_ranked.json`、`papers_summarized.json` 等中间产物
+
+也可以指定输出路径：
+
+```bash
+python3 scripts/recommend.py \
+  --config config.yaml \
+  --free-text "我做多模态智能体和 tool use，帮我推荐最近论文" \
+  --output-markdown outputs/my_recommendation.md \
+  --output-json outputs/my_recommendation.json
 ```
 
 ## 常见触发方式
+
+独立 CLI：
+
+```bash
+python3 scripts/recommend.py --topics "多模态智能体, tool use"
+```
+
+```bash
+python3 scripts/recommend.py --topics "LLM reasoning" --language-sort en --start-year 2024
+```
+
+```bash
+python3 scripts/recommend.py --scholar-name "Jie Tang" --scholar-org "Tsinghua University" --paper-title "OAG-Bench" --paper-title "RPC-Bench"
+```
+
+飞书 / OpenClaw 命令文本：
 
 ```text
 /aminer-rec5 topics: 多模态智能体, tool use
@@ -88,13 +122,14 @@ python3 scripts/handle_trigger.py \
 
 ## 接口约束
 
-这个公开仓库对外只支持一个入口：
+这个公开仓库对外支持两个入口：
 
 ```bash
+python3 scripts/recommend.py --base-dir . --topics "多模态智能体, tool use"
 python3 scripts/handle_trigger.py --base-dir . --text "<message>"
 ```
 
-`scripts/` 目录里的其它模块都属于内部实现细节，不承诺对外兼容。
+独立本地使用走 `scripts/recommend.py`；飞书 / OpenClaw 触发处理走 `scripts/handle_trigger.py`。`scripts/` 目录里的其它模块都属于内部实现细节，不承诺对外兼容。
 
 入口层现在会做这些限制：
 
@@ -111,22 +146,26 @@ python3 scripts/handle_trigger.py --base-dir . --text "<message>"
 
 ## 输出产物
 
-运行后会在 `outputs/` 下生成：
+独立 CLI 默认会在 `outputs_cli/` 下生成：
+
+- `recommendation.md`
+- `recommendation_result.json`
+
+流水线中间产物会写入所选输出目录：
 
 - `request_context.json`
-- `runtime_config.yaml`
 - `user_profile.json`
 - `arxiv_candidates.json`
 - `papers_ranked.json`
 - `papers_summarized.json`
-- `feishu_messages.json`
 
 这些都是本地运行产物，公开仓库里不要提交。
 
 ## 仓库结构
 
 - `SKILL.md` / `SKILL_zh.md`：OpenClaw skill 契约
-- `scripts/handle_trigger.py`：唯一受支持的对外入口
+- `scripts/recommend.py`：独立 CLI 入口
+- `scripts/handle_trigger.py`：飞书 / OpenClaw 触发入口
 - `scripts/`：内部实现，包括触发解析、画像构建、召回、摘要、渲染、派发
 - `config.example.yaml`：安全版示例配置
 - `.env.example`：可选环境变量模板

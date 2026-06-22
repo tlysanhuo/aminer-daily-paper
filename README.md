@@ -1,13 +1,13 @@
 # aminer-rec
 
-Public repository for the `aminer-rec5` OpenClaw / Feishu paper recommendation skill, with two smooth entry points:
+Public repository for an AMiner-powered personalized paper recommendation pipeline, with two smooth entry points:
 
 - scholar bootstrap: start from `aminer_user_id`, `scholar + org`, representative papers, or a local `papers_file`
 - topic bootstrap: start from `topics` or free-form natural language such as "I work on multimodal agents and tool use"
 
-The repository turns both paths into one unified `ResearchProfile`, then runs retrieval, AMiner enrichment, summarization, card rendering, and delivery.
+The repository turns both paths into one unified `ResearchProfile`, then runs retrieval, AMiner enrichment, ranking, summarization, and local output rendering.
 
-The OpenClaw command name remains `/aminer-rec5`.
+Feishu / OpenClaw integration is optional. The OpenClaw command name remains `/aminer-rec5`.
 
 ## Why This Version Exists
 
@@ -27,7 +27,8 @@ If you want to post this on social platforms and drive traffic to a personal Git
 - Unified topic and scholar profile building
 - arXiv retrieval plus AMiner enrich
 - Structured summaries and recommendation reasons
-- Feishu / OpenClaw-friendly output format
+- Standalone CLI output as Markdown / JSON
+- Optional Feishu / OpenClaw-friendly output format
 - Graceful degradation when optional internal components are unavailable
 
 ## Quick Start
@@ -59,16 +60,49 @@ Recommended behavior:
 
 `datacenter.segmentation_url` is optional. Leave it empty if you do not have access to an internal segmentation service; the pipeline will fall back to lighter local parsing.
 
-### 3. Run a local check
+### 3. Run the standalone CLI
 
 ```bash
-python3 scripts/handle_trigger.py \
+python3 scripts/recommend.py \
   --base-dir . \
   --config config.yaml \
-  --text "/aminer-rec5 I work on multimodal agents and tool use. Recommend recent papers."
+  --topics "multimodal agents, tool use" \
+  --start-year 2024
+```
+
+The CLI does not require Feishu or OpenClaw. It writes:
+
+- `outputs_cli/recommendation.md`
+- `outputs_cli/recommendation_result.json`
+- intermediate artifacts such as `user_profile.json`, `papers_ranked.json`, and `papers_summarized.json`
+
+You can also write to explicit paths:
+
+```bash
+python3 scripts/recommend.py \
+  --config config.yaml \
+  --free-text "I work on multimodal agents and tool use. Recommend recent papers." \
+  --output-markdown outputs/my_recommendation.md \
+  --output-json outputs/my_recommendation.json
 ```
 
 ## Example Inputs
+
+Standalone CLI:
+
+```bash
+python3 scripts/recommend.py --topics "multimodal agents, tool use"
+```
+
+```bash
+python3 scripts/recommend.py --topics "LLM reasoning" --language-sort en --start-year 2024
+```
+
+```bash
+python3 scripts/recommend.py --scholar-name "Jie Tang" --scholar-org "Tsinghua University" --paper-title "OAG-Bench" --paper-title "RPC-Bench"
+```
+
+Feishu / OpenClaw command text:
 
 ```text
 /aminer-rec5 topics: multimodal agents, tool use
@@ -88,13 +122,14 @@ python3 scripts/handle_trigger.py \
 
 ## Interface Contract
 
-The public repo exposes exactly one supported external entrypoint:
+The public repo exposes two supported external entrypoints:
 
 ```bash
+python3 scripts/recommend.py --base-dir . --topics "multimodal agents, tool use"
 python3 scripts/handle_trigger.py --base-dir . --text "<message>"
 ```
 
-Everything else under `scripts/` is internal implementation detail and may change without compatibility guarantees.
+Use `scripts/recommend.py` for standalone local usage. Use `scripts/handle_trigger.py` only for Feishu / OpenClaw trigger handling. Everything else under `scripts/` is internal implementation detail and may change without compatibility guarantees.
 
 Input guardrails at the entrypoint:
 
@@ -111,22 +146,26 @@ Input guardrails at the entrypoint:
 
 ## Outputs
 
-Runtime artifacts are written to `outputs/`:
+Standalone CLI artifacts are written to `outputs_cli/` by default:
+
+- `recommendation.md`
+- `recommendation_result.json`
+
+Pipeline runtime artifacts are written to the selected output directory:
 
 - `request_context.json`
-- `runtime_config.yaml`
 - `user_profile.json`
 - `arxiv_candidates.json`
 - `papers_ranked.json`
 - `papers_summarized.json`
-- `feishu_messages.json`
 
 These files are local runtime outputs and should stay out of git.
 
 ## Repository Layout
 
 - `SKILL.md` / `SKILL_zh.md`: OpenClaw skill contract
-- `scripts/handle_trigger.py`: the only supported external interface
+- `scripts/recommend.py`: standalone CLI entrypoint
+- `scripts/handle_trigger.py`: Feishu / OpenClaw trigger entrypoint
 - `scripts/`: internal implementation for parsing, profile building, retrieval, summarization, rendering, and dispatch
 - `config.example.yaml`: safe example configuration
 - `.env.example`: optional environment variables for local overrides
