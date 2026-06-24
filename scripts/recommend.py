@@ -6,6 +6,7 @@ import json
 import re
 import sys
 from pathlib import Path
+from collections.abc import Sequence
 from typing import Any
 
 import yaml
@@ -15,6 +16,17 @@ if __package__ in {None, ""}:
 
 from scripts.common import write_json
 from scripts.run_pipeline import run_pipeline
+
+MAX_TOPICS = 8
+MAX_TOPIC_LENGTH = 80
+MAX_PAPER_TITLES = 8
+MAX_PAPER_TITLE_LENGTH = 300
+MAX_SCHOLAR_NAME_LENGTH = 80
+MAX_SCHOLAR_ORG_LENGTH = 160
+MAX_FREE_TEXT_LENGTH = 600
+MIN_YEAR = 1900
+MAX_YEAR = 2100
+ALLOWED_PAPERS_FILE_SUFFIXES = {".json"}
 
 
 def _clean_text(value: Any) -> str:
@@ -48,11 +60,12 @@ def _default_config_path(base_dir: Path) -> Path:
     return base_dir / "config.example.yaml"
 
 
-def _build_parser() -> argparse.ArgumentParser:
+def _build_parser(prog: str | None = None) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
+        prog=prog,
         description="Run AMiner personalized paper recommendation without Feishu or OpenClaw.",
     )
-    parser.add_argument("--base-dir", type=Path, default=Path(__file__).resolve().parents[1])
+    parser.add_argument("--base-dir", type=Path, default=Path.cwd())
     parser.add_argument("--config", type=Path, default=None)
     parser.add_argument("--output-dir", type=Path, default=None)
     parser.add_argument("--output-markdown", type=Path, default=None)
@@ -86,9 +99,69 @@ def _has_profile_input(args: argparse.Namespace, topics: list[str]) -> bool:
     )
 
 
-def main() -> int:
-    parser = _build_parser()
-    args = parser.parse_args()
+def _validate_text_length(parser: argparse.ArgumentParser, value: str, *, field: str, max_length: int) -> str:
+    cleaned = _clean_text(value)
+    if len(cleaned) > max_length:
+        parser.error(f"{field} must be at most {max_length} characters")
+    return cleaned
+
+
+def _validate_list(
+    parser: argparse.ArgumentParser,
+    values: list[str],
+    *,
+    field: str,
+    max_count: int,
+    max_length: int,
+) -> list[str]:
+    if len(values) > max_count:
+        parser.error(f"{field} accepts at most {max_count} items")
+    validated: list[str] = []
+    for index, value in enumerate(values, start=1):
+        cleaned = _clean_text(value)
+        if len(cleaned) > max_length:
+            parser.error(f"{field}[{index}] must be at most {max_length} characters")
+        if cleaned:
+            validated.append(cleaned)
+    return validated
+
+
+def _validate_aminer_user_id(parser: argparse.ArgumentParser, value: str) -> str:
+    cleaned = _clean_text(value)
+    if cleaned and not re.fullmatch(r"[0-9a-fA-F]{24}", cleaned):
+        parser.error("--aminer-user-id must be a 24-character hexadecimal string")
+    return cleaned
+
+
+def _validate_year(parser: argparse.ArgumentParser, value: int, *, field: str) -> int:
+    year = int(value or 0)
+    if year and not (MIN_YEAR <= year <= MAX_YEAR):
+        parser.error(f"{field} must be between {MIN_YEAR} and {MAX_YEAR}")
+    return year
+
+
+def _resolve_papers_file(parser: argparse.ArgumentParser, base_dir: Path, path_text: str) -> str:
+    cleaned = _clean_text(path_text)
+    if not cleaned:
+        return ""
+
+    candidate = Path(cleaned).expanduser()
+    resolved_base_dir = base_dir.resolve()
+    resolved_candidate = (resolved_base_dir / candidate).resolve() if not candidate.is_absolute() else candidate.resolve()
+    try:
+        resolved_candidate.relative_to(resolved_base_dir)
+    except ValueError:
+        parser.error("--papers-file must stay inside --base-dir")
+    if resolved_candidate.suffix.lower() not in ALLOWED_PAPERS_FILE_SUFFIXES:
+        parser.error("--papers-file only supports .json files")
+    if not resolved_candidate.exists():
+        parser.error(f"--papers-file does not exist: {resolved_candidate}")
+    return str(resolved_candidate)
+
+
+def main(argv: Sequence[str] | None = None, *, prog: str | None = None) -> int:
+    parser = _build_parser(prog=prog)
+    args = parser.parse_args(argv)
 
     base_dir = args.base_dir.resolve()
     config_path = (args.config.resolve() if args.config else _default_config_path(base_dir).resolve())
@@ -96,8 +169,30 @@ def main() -> int:
     output_markdown = args.output_markdown.resolve() if args.output_markdown else output_dir / "recommendation.md"
     output_json = args.output_json.resolve() if args.output_json else output_dir / "recommendation_result.json"
 
-    topics = _split_text_values([*list(args.topics or []), *list(args.topic or [])])
-    paper_titles = [_clean_text(item) for item in list(args.paper_titles or []) if _clean_text(item)]
+    aminer_user_id = _validate_aminer_user_id(parser, args.aminer_user_id)
+    topics = _validate_list(
+        parser,
+        _split_text_values([*list(args.topics or []), *list(args.topic or [])]),
+        field="topics",
+        max_count=MAX_TOPICS,
+        max_length=MAX_TOPIC_LENGTH,
+    )
+    scholar_name = _validate_text_length(parser, args.scholar_name, field="scholar_name", max_length=MAX_SCHOLAR_NAME_LENGTH)
+    scholar_org = _validate_text_length(parser, args.scholar_org, field="scholar_org", max_length=MAX_SCHOLAR_ORG_LENGTH)
+    paper_titles = _validate_list(
+        parser,
+        [_clean_text(item) for item in list(args.paper_titles or []) if _clean_text(item)],
+        field="paper_titles",
+        max_count=MAX_PAPER_TITLES,
+        max_length=MAX_PAPER_TITLE_LENGTH,
+    )
+    papers_file = _resolve_papers_file(parser, base_dir, args.papers_file)
+    free_text = _validate_text_length(parser, args.free_text, field="free_text", max_length=MAX_FREE_TEXT_LENGTH)
+    start_year = _validate_year(parser, args.start_year, field="--start-year")
+    end_year = _validate_year(parser, args.end_year, field="--end-year")
+    if start_year and end_year and start_year > end_year:
+        parser.error("--start-year cannot be greater than --end-year")
+
     if not _has_profile_input(args, topics):
         parser.error(
             "provide at least one profile signal: --topics, --free-text, "
@@ -108,16 +203,16 @@ def main() -> int:
         base_dir=base_dir,
         output_dir=output_dir,
         config=_load_yaml(config_path),
-        aminer_user_id=_clean_text(args.aminer_user_id),
+        aminer_user_id=aminer_user_id,
         topics=topics,
-        scholar_name=_clean_text(args.scholar_name),
-        scholar_org=_clean_text(args.scholar_org),
+        scholar_name=scholar_name,
+        scholar_org=scholar_org,
         paper_titles=paper_titles,
-        papers_file=_clean_text(args.papers_file),
-        free_text=_clean_text(args.free_text),
+        papers_file=papers_file,
+        free_text=free_text,
         language_sort=_clean_text(args.language_sort),
-        start_year=int(args.start_year or 0),
-        end_year=int(args.end_year or 0),
+        start_year=start_year,
+        end_year=end_year,
         target="",
         account_id="local",
         skip_dispatch=True,

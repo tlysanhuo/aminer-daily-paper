@@ -38,7 +38,8 @@ If you want to post this on social platforms and drive traffic to a personal Git
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+python3 -m pip install --upgrade pip
+pip install -e .
 ```
 
 ### 2. Create your config
@@ -47,23 +48,20 @@ pip install -r requirements.txt
 cp config.example.yaml config.yaml
 ```
 
-You can either fill `config.yaml` explicitly, or leave some fields empty and let the runtime discover them from local OpenClaw / environment settings.
+For standalone CLI usage, fill `config.yaml` explicitly.
 
 - `aminer.token`: your own AMiner token
 - `llm.api_key`: your OpenAI-compatible model key
 - `llm.base_url` and `llm.model`: the provider/model you want to use
 
-Recommended behavior:
-
-- leave `llm.api_key` / `llm.base_url` empty if your local OpenClaw already has a working model config
-- leave `aminer.token` empty if you prefer to provide `AMINER_TOKEN` from the environment
+The Feishu / OpenClaw trigger entrypoint can still discover local OpenClaw model settings, but the standalone CLI is intentionally config-first.
 
 `datacenter.segmentation_url` is optional. Leave it empty if you do not have access to an internal segmentation service; the pipeline will fall back to lighter local parsing.
 
 ### 3. Run the standalone CLI
 
 ```bash
-python3 scripts/recommend.py \
+aminer-rec recommend \
   --base-dir . \
   --config config.yaml \
   --topics "multimodal agents, tool use" \
@@ -79,11 +77,17 @@ The CLI does not require Feishu or OpenClaw. It writes:
 You can also write to explicit paths:
 
 ```bash
-python3 scripts/recommend.py \
+aminer-rec recommend \
   --config config.yaml \
   --free-text "I work on multimodal agents and tool use. Recommend recent papers." \
   --output-markdown outputs/my_recommendation.md \
   --output-json outputs/my_recommendation.json
+```
+
+The script entrypoint remains available for repository-local use:
+
+```bash
+python3 scripts/recommend.py --config config.yaml --topics "multimodal agents, tool use"
 ```
 
 ## Example Inputs
@@ -91,15 +95,15 @@ python3 scripts/recommend.py \
 Standalone CLI:
 
 ```bash
-python3 scripts/recommend.py --topics "multimodal agents, tool use"
+aminer-rec recommend --topics "multimodal agents, tool use"
 ```
 
 ```bash
-python3 scripts/recommend.py --topics "LLM reasoning" --language-sort en --start-year 2024
+aminer-rec recommend --topics "LLM reasoning" --language-sort en --start-year 2024
 ```
 
 ```bash
-python3 scripts/recommend.py --scholar-name "Jie Tang" --scholar-org "Tsinghua University" --paper-title "OAG-Bench" --paper-title "RPC-Bench"
+aminer-rec recommend --scholar-name "Jie Tang" --scholar-org "Tsinghua University" --paper-title "OAG-Bench" --paper-title "RPC-Bench"
 ```
 
 Feishu / OpenClaw command text:
@@ -122,14 +126,15 @@ Feishu / OpenClaw command text:
 
 ## Interface Contract
 
-The public repo exposes two supported external entrypoints:
+The public repo exposes standalone and Feishu / OpenClaw entrypoints:
 
 ```bash
+aminer-rec recommend --base-dir . --topics "multimodal agents, tool use"
 python3 scripts/recommend.py --base-dir . --topics "multimodal agents, tool use"
 python3 scripts/handle_trigger.py --base-dir . --text "<message>"
 ```
 
-Use `scripts/recommend.py` for standalone local usage. Use `scripts/handle_trigger.py` only for Feishu / OpenClaw trigger handling. Everything else under `scripts/` is internal implementation detail and may change without compatibility guarantees.
+Use `aminer-rec recommend` for standalone local usage. `scripts/recommend.py` is the repository-local compatibility entrypoint. Use `scripts/handle_trigger.py` only for Feishu / OpenClaw trigger handling. Everything else under `scripts/` is internal implementation detail and may change without compatibility guarantees.
 
 Input guardrails at the entrypoint:
 
@@ -164,6 +169,8 @@ These files are local runtime outputs and should stay out of git.
 ## Repository Layout
 
 - `SKILL.md` / `SKILL_zh.md`: OpenClaw skill contract
+- `pyproject.toml`: install metadata and `aminer-rec` console command
+- `aminer_rec/`: package-level CLI dispatcher
 - `scripts/recommend.py`: standalone CLI entrypoint
 - `scripts/handle_trigger.py`: Feishu / OpenClaw trigger entrypoint
 - `scripts/`: internal implementation for parsing, profile building, retrieval, summarization, rendering, and dispatch
