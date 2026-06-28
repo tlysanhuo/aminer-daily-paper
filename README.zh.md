@@ -1,206 +1,209 @@
-# aminer-rec
+<div align="center">
 
-AMiner 个性化论文推荐流水线的公开仓库版，支持两种非常顺手的输入方式：
+# 📚 aminer-rec
 
-- 学者启动：从 `aminer_user_id`、`scholar + org`、代表论文，或者本地 `papers_file` 出发
-- 主题启动：直接给 `topics`，或者一句自然语言，比如“我做多模态智能体和 tool use，帮我推荐最近论文”
+**别再在海量 arXiv 里溺水了，去读那些对你真正重要的论文。**
 
-两条路径最终都会统一归纳成一个 `ResearchProfile`，再进入同一条推荐流水线：召回、AMiner enrich、排序、摘要生成和本地输出。
+一个个性化论文推荐引擎：把一句关于研究方向的描述，变成一份带摘要和推荐理由的论文清单 —— 基于 AMiner + arXiv + 大模型构建。
 
-飞书 / OpenClaw 是可选集成。OpenClaw 里的实际命令名仍然是 `/aminer-rec5`。
+![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
+![Python](https://img.shields.io/badge/Python-3.9%2B-blue.svg)
+![CLI](https://img.shields.io/badge/构建于-科研打工人-orange.svg)
+![状态](https://img.shields.io/badge/状态-公开测试-success.svg)
 
-## 这版适合公开发
+</div>
 
-这份目录是专门为“放个人仓库、发社交平台引流”整理过的公开版：
+---
 
-- 已去掉真实 token / key
-- 已去掉本地运行产物
-- 已把硬编码的本机路径改成可移植写法
-- 已补齐对外更友好的 README 和安装说明
+## ✨ 你会喜欢它的理由
 
-如果你要发 GitHub 链接、写推文、发朋友圈或技术社区帖子，推荐直接用这版。
+想象这样一个周一早晨：你坐下来，敲下
 
-## 核心卖点
+> *"我做多模态智能体和 tool use"*
 
-- 自然语言直接触发论文推荐
-- 支持从学者线索冷启动
-- topic / scholar 双路径统一画像
-- `arXiv + AMiner enrich` 的组合式召回
-- 输出结构化摘要和推荐理由
-- 独立 CLI 输出 Markdown / JSON
-- 可选对接 Feishu / OpenClaw 使用场景
-- 内部依赖不可用时可以优雅降级，不至于整个链路跑不起来
+一分钟后，你就拿到了一份**排好序的近期论文清单**，每篇都附带**通俗摘要**和**一句话推荐理由**。再也不用开 200 个 arXiv 标签页，再也不用担心「我是不是错过那篇重要的」。
 
-## 快速开始
+`aminer-rec` 替你跑完整个闭环：
 
-### 1. 安装依赖
+| 你给它 | 它还你 |
+|---|---|
+| 一句话 / 一个主题列表 / **或** 学者名 | 一份聚焦、相关的近期论文清单 |
+| 你的 AMiner 学者 id / 种子论文 | *基于画像* 的排序，更贴合你的口味 |
+| `--language-sort en` / `--start-year 2024` | 按语言、年份筛选 |
+
+## 🎯 两种冷启动，同一条流水线
+
+哪种更省事就用哪种：
+
+- 🧠 **主题启动** —— 用大白话描述你做什么就行。
+  > `--free-text "我做多模态智能体和 tool use"`
+- 🎓 **学者启动** —— 从 `aminer_user_id`、姓名+机构，或几篇代表论文出发。流水线会从你的真实发文历史构建 `ResearchProfile`，并据此排序。
+
+两条路径最终都归并成一个 `ResearchProfile`，再走同一条流水线：
+
+```
+                  ┌─────────────────────────────────────────────┐
+  topics / text ──▶│                                             │
+                  │            构建 ResearchProfile             │
+  scholar / id  ──▶│                                             │
+                  └──────────────────────┬──────────────────────┘
+                                         │
+          ┌──────────────────────────────▼──────────────────────────────┐
+          │   arXiv 召回   ▶   AMiner 丰富   ▶   排序                    │
+          └──────────────────────────────┬──────────────────────────────┘
+                                         │
+          ┌──────────────────────────────▼──────────────────────────────┐
+          │   LLM 摘要生成 + 推荐理由   ▶   渲染                          │
+          └──────────────────────────────┬──────────────────────────────┘
+                                         │
+                          Markdown · JSON ·（可选）飞书卡片
+```
+
+## 🚀 快速开始
+
+### 1 · 安装
 
 ```bash
 python3 -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
 python3 -m pip install --upgrade pip
 pip install -e .
 ```
 
-### 2. 准备配置
+### 2 · 配置
 
 ```bash
 cp config.example.yaml config.yaml
 ```
 
-独立 CLI 使用时，请显式填写 `config.yaml`。
+在 `config.yaml` 里填好这三处：
 
-- `aminer.token`：你自己的 AMiner token
-- `llm.api_key`：你自己的 OpenAI 兼容模型 key
-- `llm.base_url` / `llm.model`：你实际使用的模型服务
+```yaml
+aminer:
+  token: "<你的 AMiner token>"
+llm:
+  api_key:  "<你的 OpenAI 兼容 key>"
+  base_url: "<你的模型服务地址>"
+  model:    "gpt-5-mini"
+```
 
-飞书 / OpenClaw 触发入口仍然可以发现本机 OpenClaw 模型配置，但独立 CLI 会优先保持配置显式。
+> 💡 `datacenter.segmentation_url` 是可选项 —— 留空即可，链路会退化到更轻量的本地解析。
 
-`datacenter.segmentation_url` 是可选项。如果你没有内部分词/解析服务，直接留空即可，链路会退化到较轻量的本地解析逻辑。
-
-### 3. 运行独立 CLI
+### 3 · 拿推荐
 
 ```bash
 aminer-rec recommend \
-  --base-dir . \
   --config config.yaml \
   --topics "多模态智能体, tool use" \
   --start-year 2024
 ```
 
-这个 CLI 不需要飞书或 OpenClaw。默认会写出：
+结果写在 `outputs_cli/`：
 
-- `outputs_cli/recommendation.md`
-- `outputs_cli/recommendation_result.json`
-- `user_profile.json`、`papers_ranked.json`、`papers_summarized.json` 等中间产物
+- `recommendation.md` —— 带摘要的可读清单
+- `recommendation_result.json` —— 完整结构化结果
+- 外加中间产物（`user_profile.json`、`papers_ranked.json`、`papers_summarized.json`）
 
-也可以指定输出路径：
+## 🧪 更多示例
+
+一句话描述自己：
 
 ```bash
 aminer-rec recommend \
-  --config config.yaml \
   --free-text "我做多模态智能体和 tool use，帮我推荐最近论文" \
-  --output-markdown outputs/my_recommendation.md \
-  --output-json outputs/my_recommendation.json
+  --output-markdown outputs/mine.md \
+  --output-json outputs/mine.json
 ```
 
-仓库内也保留脚本入口：
-
-```bash
-python3 scripts/recommend.py --config config.yaml --topics "多模态智能体, tool use"
-```
-
-## 常见触发方式
-
-独立 CLI：
-
-```bash
-aminer-rec recommend --topics "多模态智能体, tool use"
-```
+2024 年以来关于 LLM reasoning 的英文论文：
 
 ```bash
 aminer-rec recommend --topics "LLM reasoning" --language-sort en --start-year 2024
 ```
 
-```bash
-aminer-rec recommend --scholar-name "Jie Tang" --scholar-org "Tsinghua University" --paper-title "OAG-Bench" --paper-title "RPC-Bench"
-```
-
-飞书 / OpenClaw 命令文本：
-
-```text
-/aminer-rec5 topics: 多模态智能体, tool use
-```
-
-```text
-/aminer-rec5 topics: LLM reasoning language_sort: en start_year: 2024
-```
-
-```text
-/aminer-rec5 scholar: Jie Tang org: Tsinghua University papers: OAG-Bench | RPC-Bench
-```
-
-```text
-/aminer-rec5 aminer_user_id: 696259801cb939bc391d3a37 topics: 多模态, tool use
-```
-
-## 接口约束
-
-这个公开仓库对外支持独立使用入口和飞书 / OpenClaw 入口：
+从学者 + 其代表作冷启动：
 
 ```bash
-aminer-rec recommend --base-dir . --topics "多模态智能体, tool use"
-python3 scripts/recommend.py --base-dir . --topics "多模态智能体, tool use"
-python3 scripts/handle_trigger.py --base-dir . --text "<message>"
+aminer-rec recommend \
+  --scholar-name "Jie Tang" --scholar-org "Tsinghua University" \
+  --paper-title "OAG-Bench" --paper-title "RPC-Bench"
 ```
 
-独立本地使用走 `aminer-rec recommend`；`scripts/recommend.py` 是仓库内兼容入口；飞书 / OpenClaw 触发处理走 `scripts/handle_trigger.py`。`scripts/` 目录里的其它模块都属于内部实现细节，不承诺对外兼容。
+也可以用仓库内脚本入口：
 
-入口层现在会做这些限制：
+```bash
+python3 scripts/recommend.py --config config.yaml --topics "多模态智能体, tool use"
+```
 
-- `aminer_user_id` 必须是 24 位十六进制字符串
-- `topics` 最多 8 个，每个最多 80 个字符
-- `paper_titles` 最多 8 个，每个最多 300 个字符
-- `scholar_name` 最多 80 个字符
-- `scholar_org` 最多 160 个字符
-- `free_text` 最多 600 个字符
-- `papers_file` 只允许 `.json`，而且路径必须在当前 skill 目录内
-- `language_sort` 只允许 `zh` 或 `en`，按论文语言过滤结果
-- `start_year` / `end_year`：1900–2100 之间的整数，按发表年份过滤
-- 派发用的路由字段会先截断到安全长度再使用
+## 🐦 飞书 / OpenClaw 模式（可选）
 
-## 输出产物
-
-独立 CLI 默认会在 `outputs_cli/` 下生成：
-
-- `recommendation.md`
-- `recommendation_result.json`
-
-流水线中间产物会写入所选输出目录：
-
-- `request_context.json`
-- `user_profile.json`
-- `arxiv_candidates.json`
-- `papers_ranked.json`
-- `papers_summarized.json`
-
-这些都是本地运行产物，公开仓库里不要提交。
-
-## 仓库结构
-
-- `SKILL.md` / `SKILL_zh.md`：OpenClaw skill 契约
-- `pyproject.toml`：安装元数据和 `aminer-rec` 命令
-- `aminer_rec/`：包级 CLI 分发入口
-- `scripts/recommend.py`：独立 CLI 入口
-- `scripts/handle_trigger.py`：飞书 / OpenClaw 触发入口
-- `scripts/`：内部实现，包括触发解析、画像构建、召回、摘要、渲染、派发
-- `config.example.yaml`：安全版示例配置
-- `.env.example`：可选环境变量模板
-
-## 可选内部扩展点
-
-这个公开版保留了几个可选扩展口，方便你在内外部环境都能跑：
-
-- `DATACENTER_SEGMENTATION_URL`：如果你有分词/参数抽取服务，可以接上
-- `RECSYS_NEXT_DIR`：如果你有内部画像依赖目录，可以打开 UID 画像增强
-- `OPENCLAW_HOME`、`OPENCLAW_CONFIG_PATH`、`OPENCLAW_SESSIONS_PATH`：可以覆盖 OpenClaw 的本地路径
-
-如果这些都没有配置，公开版依然能运行，只是部分增强能力会降级。
-
-## 安装到 OpenClaw
-
-把仓库复制或克隆到你的 OpenClaw skills 目录：
+把仓库复制到你的 skills 目录：
 
 ```bash
 cp -R ./aminer-rec ~/.openclaw/skills/aminer-rec5
 ```
 
-然后就可以在飞书里触发：
+然后在飞书里：
 
 ```text
 /aminer-rec5 topics: 多模态智能体, tool use
+/aminer-rec5 topics: LLM reasoning  language_sort: en  start_year: 2024
+/aminer-rec5 scholar: Jie Tang  org: Tsinghua University  papers: OAG-Bench | RPC-Bench
+/aminer-rec5 aminer_user_id: 696259801cb939bc391d3a37  topics: 多模态, tool use
 ```
 
-## License
+OpenClaw 里的命令名仍是 `/aminer-rec5`。
 
-[MIT](LICENSE)
+## ✅ 开箱即用的能力
+
+- 💬 **自然语言优先** —— 一句话就够
+- 🔍 **arXiv + AMiner 丰富** —— 召回更广，元数据更深
+- 👤 **学者感知的冷启动** —— 基于你真实画像的排序
+- 📝 **结构化摘要** —— 每篇都有通俗摘要 *和* 推荐理由
+- 📄 **CLI 输出** —— Markdown / JSON，方便版本管理
+- 🐧 **优雅降级** —— 缺了可选组件也不会跑不起来
+- 🚦 **输入护栏** —— 合理限制，保证跑出来可复现
+
+## 📂 仓库结构
+
+| 路径 | 用途 |
+|---|---|
+| `SKILL.md` / `SKILL_zh.md` | OpenClaw skill 契约 |
+| `pyproject.toml` | 安装元数据 + `aminer-rec` 命令 |
+| `aminer_rec/` | 包级 CLI 分发入口 |
+| `scripts/recommend.py` | 独立 CLI 入口 |
+| `scripts/handle_trigger.py` | 飞书 / OpenClaw 触发入口 |
+| `scripts/` | 核心流水线：解析、画像、召回、摘要、渲染、派发 |
+| `config.example.yaml` | 安全版示例配置 |
+
+## 🛠️ 接口约束与护栏
+
+对外入口：
+
+```bash
+aminer-rec recommend --base-dir . --topics "多模态智能体, tool use"
+python3 scripts/recommend.py      --base-dir . --topics "多模态智能体, tool use"
+python3 scripts/handle_trigger.py --base-dir . --text "<message>"
+```
+
+- `aminer_user_id` —— 24 位十六进制字符串
+- `topics` —— 最多 8 个，每个 ≤ 80 字符
+- `paper_titles` —— 最多 8 个，每个 ≤ 300 字符
+- `scholar_name` ≤ 80 字符 · `scholar_org` ≤ 160 字符 · `free_text` ≤ 600 字符
+- `papers_file` —— 只接受 `.json`，且必须在 skill 目录内
+- `language_sort` —— `zh` 或 `en`
+- `start_year` / `end_year` —— 1900–2100 之间的整数
+
+派发前路由字段会截断到安全长度。
+
+## 🔌 可选内部扩展点
+
+这些都没配？照样能跑，部分功能会优雅降级而已。
+
+- `DATACENTER_SEGMENTATION_URL` —— 更好的分词 / 参数抽取
+- `RECSYS_NEXT_DIR` —— 内部 UID 画像查询
+- `OPENCLAW_HOME` / `OPENCLAW_CONFIG_PATH` / `OPENCLAW_SESSIONS_PATH` —— 覆盖本地 OpenClaw 路径
+
+## 📄 License
+
+[MIT](LICENSE) —— 读论文，发想法，注明出处即可。

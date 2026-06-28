@@ -1,206 +1,209 @@
-# aminer-rec
+<div align="center">
 
-Public repository for an AMiner-powered personalized paper recommendation pipeline, with two smooth entry points:
+# 📚 aminer-rec
 
-- scholar bootstrap: start from `aminer_user_id`, `scholar + org`, representative papers, or a local `papers_file`
-- topic bootstrap: start from `topics` or free-form natural language such as "I work on multimodal agents and tool use"
+**Stop drowning in arXiv. Start reading what actually matters to *you*.**
 
-The repository turns both paths into one unified `ResearchProfile`, then runs retrieval, AMiner enrichment, ranking, summarization, and local output rendering.
+A personalized paper-recommendation engine that turns *one sentence* about your research into a ranked, summarized reading list — built on AMiner + arXiv + LLMs.
 
-Feishu / OpenClaw integration is optional. The OpenClaw command name remains `/aminer-rec5`.
+![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
+![Python](https://img.shields.io/badge/Python-3.9%2B-blue.svg)
+![CLI](https://img.shields.io/badge/Built%20for-Researchers-orange.svg)
+![Status](https://img.shields.io/badge/status-public%20beta-success)
 
-## Why This Version Exists
+</div>
 
-This is the public-shareable repo cut of `aminer-rec5`:
+---
 
-- secrets removed
-- local output artifacts removed
-- hard-coded machine paths replaced with portable defaults
-- README and setup flow rewritten for external users
+## ✨ Why you'll like it
 
-If you want to post this on social platforms and drive traffic to a personal GitHub repo, this version is the one to publish.
+Picture this: you walk in Monday morning, type
 
-## Highlights
+> *"I work on multimodal agents and tool use"*
 
-- Natural-language-first paper recommendation
-- Scholar-aware cold start from AMiner person signals
-- Unified topic and scholar profile building
-- arXiv retrieval plus AMiner enrich
-- Structured summaries and recommendation reasons
-- Standalone CLI output as Markdown / JSON
-- Optional Feishu / OpenClaw-friendly output format
-- Graceful degradation when optional internal components are unavailable
+…and a minute later you get a clean **ranked shortlist** of recent papers, each with a **plain-language summary** and a **one-line reason** for why it landed in your feed. No more 200-tab arXiv sessions. No more "did I miss the important one?".
 
-## Quick Start
+`aminer-rec` does the whole loop for you:
 
-### 1. Install dependencies
+| You give it | It gives you back |
+|---|---|
+| a sentence, a topic list, **or** a scholar name | a focused list of recent, relevant papers |
+| your AMiner scholar id / seed papers | a *profile-aware* ranking tuned to *your* taste |
+| `--language-sort en` / `--start-year 2024` | filtering by language and year |
+
+## 🎯 Two ways to start, one unified pipeline
+
+Pick whichever feels lazier:
+
+- 🧠 **Topic bootstrap** — just describe what you do in plain language.
+  > `--free-text "I work on multimodal agents and tool use"`
+- 🎓 **Scholar bootstrap** — start from an `aminer_user_id`, a name + org, or a few seed paper titles. The pipeline builds a `ResearchProfile` from your real publication history and uses it to rank.
+
+Both paths collapse into a single `ResearchProfile`, then flow through the same pipeline:
+
+```
+                  ┌─────────────────────────────────────────────┐
+  topics / text ──▶│                                             │
+                  │            build ResearchProfile             │
+  scholar / id  ──▶│                                             │
+                  └──────────────────────┬──────────────────────┘
+                                         │
+          ┌──────────────────────────────▼──────────────────────────────┐
+          │   arXiv retrieval   ▶   AMiner enrichment   ▶   ranking      │
+          └──────────────────────────────┬──────────────────────────────┘
+                                         │
+          ┌──────────────────────────────▼──────────────────────────────┐
+          │   LLM summaries + recommendation reasons   ▶   rendering     │
+          └──────────────────────────────┬──────────────────────────────┘
+                                         │
+                          Markdown · JSON · (optional) Feishu cards
+```
+
+## 🚀 Quick Start
+
+### 1 · Install
 
 ```bash
 python3 -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
 python3 -m pip install --upgrade pip
 pip install -e .
 ```
 
-### 2. Create your config
+### 2 · Configure
 
 ```bash
 cp config.example.yaml config.yaml
 ```
 
-For standalone CLI usage, fill `config.yaml` explicitly.
+Fill in three lines in `config.yaml`:
 
-- `aminer.token`: your own AMiner token
-- `llm.api_key`: your OpenAI-compatible model key
-- `llm.base_url` and `llm.model`: the provider/model you want to use
+```yaml
+aminer:
+  token: "<your AMiner token>"
+llm:
+  api_key:  "<your OpenAI-compatible key>"
+  base_url: "<your provider endpoint>"
+  model:    "gpt-5-mini"
+```
 
-The Feishu / OpenClaw trigger entrypoint can still discover local OpenClaw model settings, but the standalone CLI is intentionally config-first.
+> 💡 `datacenter.segmentation_url` is optional — leave it empty and the pipeline falls back to lighter local parsing.
 
-`datacenter.segmentation_url` is optional. Leave it empty if you do not have access to an internal segmentation service; the pipeline will fall back to lighter local parsing.
-
-### 3. Run the standalone CLI
+### 3 · Get recommendations
 
 ```bash
 aminer-rec recommend \
-  --base-dir . \
   --config config.yaml \
   --topics "multimodal agents, tool use" \
   --start-year 2024
 ```
 
-The CLI does not require Feishu or OpenClaw. It writes:
+You'll find the results in `outputs_cli/`:
 
-- `outputs_cli/recommendation.md`
-- `outputs_cli/recommendation_result.json`
-- intermediate artifacts such as `user_profile.json`, `papers_ranked.json`, and `papers_summarized.json`
+- `recommendation.md` — your readable reading list with summaries
+- `recommendation_result.json` — the full structured result
+- plus intermediate artifacts (`user_profile.json`, `papers_ranked.json`, `papers_summarized.json`)
 
-You can also write to explicit paths:
+## 🧪 More examples
+
+Describe yourself in one line:
 
 ```bash
 aminer-rec recommend \
-  --config config.yaml \
   --free-text "I work on multimodal agents and tool use. Recommend recent papers." \
-  --output-markdown outputs/my_recommendation.md \
-  --output-json outputs/my_recommendation.json
+  --output-markdown outputs/mine.md \
+  --output-json outputs/mine.json
 ```
 
-The script entrypoint remains available for repository-local use:
-
-```bash
-python3 scripts/recommend.py --config config.yaml --topics "multimodal agents, tool use"
-```
-
-## Example Inputs
-
-Standalone CLI:
-
-```bash
-aminer-rec recommend --topics "multimodal agents, tool use"
-```
+English papers since 2024 on LLM reasoning:
 
 ```bash
 aminer-rec recommend --topics "LLM reasoning" --language-sort en --start-year 2024
 ```
 
-```bash
-aminer-rec recommend --scholar-name "Jie Tang" --scholar-org "Tsinghua University" --paper-title "OAG-Bench" --paper-title "RPC-Bench"
-```
-
-Feishu / OpenClaw command text:
-
-```text
-/aminer-rec5 topics: multimodal agents, tool use
-```
-
-```text
-/aminer-rec5 topics: LLM reasoning language_sort: en start_year: 2024
-```
-
-```text
-/aminer-rec5 scholar: Jie Tang org: Tsinghua University papers: OAG-Bench | RPC-Bench
-```
-
-```text
-/aminer-rec5 aminer_user_id: 696259801cb939bc391d3a37 topics: multimodal, tool use
-```
-
-## Interface Contract
-
-The public repo exposes standalone and Feishu / OpenClaw entrypoints:
+Cold-start from a scholar + their signature papers:
 
 ```bash
-aminer-rec recommend --base-dir . --topics "multimodal agents, tool use"
-python3 scripts/recommend.py --base-dir . --topics "multimodal agents, tool use"
-python3 scripts/handle_trigger.py --base-dir . --text "<message>"
+aminer-rec recommend \
+  --scholar-name "Jie Tang" --scholar-org "Tsinghua University" \
+  --paper-title "OAG-Bench" --paper-title "RPC-Bench"
 ```
 
-Use `aminer-rec recommend` for standalone local usage. `scripts/recommend.py` is the repository-local compatibility entrypoint. Use `scripts/handle_trigger.py` only for Feishu / OpenClaw trigger handling. Everything else under `scripts/` is internal implementation detail and may change without compatibility guarantees.
+Or use the in-repo entrypoint:
 
-Input guardrails at the entrypoint:
+```bash
+python3 scripts/recommend.py --config config.yaml --topics "multimodal agents, tool use"
+```
 
-- `aminer_user_id` must be a 24-character hex string
-- `topics`: up to 8 items, 80 characters each
-- `paper_titles`: up to 8 items, 300 characters each
-- `scholar_name`: up to 80 characters
-- `scholar_org`: up to 160 characters
-- `free_text`: up to 600 characters
-- `papers_file`: JSON only, and must stay inside the current skill directory
-- `language_sort`: must be `zh` or `en`; filters papers by language
-- `start_year` / `end_year`: integer between 1900–2100; filters papers by publication year
-- delivery routing fields are truncated to safe lengths before dispatch
+## 🐦 Feishu / OpenClaw mode (optional)
 
-## Outputs
-
-Standalone CLI artifacts are written to `outputs_cli/` by default:
-
-- `recommendation.md`
-- `recommendation_result.json`
-
-Pipeline runtime artifacts are written to the selected output directory:
-
-- `request_context.json`
-- `user_profile.json`
-- `arxiv_candidates.json`
-- `papers_ranked.json`
-- `papers_summarized.json`
-
-These files are local runtime outputs and should stay out of git.
-
-## Repository Layout
-
-- `SKILL.md` / `SKILL_zh.md`: OpenClaw skill contract
-- `pyproject.toml`: install metadata and `aminer-rec` console command
-- `aminer_rec/`: package-level CLI dispatcher
-- `scripts/recommend.py`: standalone CLI entrypoint
-- `scripts/handle_trigger.py`: Feishu / OpenClaw trigger entrypoint
-- `scripts/`: internal implementation for parsing, profile building, retrieval, summarization, rendering, and dispatch
-- `config.example.yaml`: safe example configuration
-- `.env.example`: optional environment variables for local overrides
-
-## Optional Internal Hooks
-
-This public repo keeps a few optional extension points for internal environments:
-
-- `DATACENTER_SEGMENTATION_URL`: enables better query segmentation if you have that service
-- `RECSYS_NEXT_DIR`: enables internal UID profile lookup if you have the private dependency tree
-- `OPENCLAW_HOME`, `OPENCLAW_CONFIG_PATH`, `OPENCLAW_SESSIONS_PATH`: override local OpenClaw locations
-
-Without them, the public version still runs, but some scholar-boost and routing features will degrade gracefully.
-
-## OpenClaw Install
-
-Clone or copy this repository into your OpenClaw skills directory:
+Drop the repo into your skills folder:
 
 ```bash
 cp -R ./aminer-rec ~/.openclaw/skills/aminer-rec5
 ```
 
-Then invoke it in Feishu:
+Then in Feishu:
 
 ```text
 /aminer-rec5 topics: multimodal agents, tool use
+/aminer-rec5 topics: LLM reasoning  language_sort: en  start_year: 2024
+/aminer-rec5 scholar: Jie Tang  org: Tsinghua University  papers: OAG-Bench | RPC-Bench
+/aminer-rec5 aminer_user_id: 696259801cb939bc391d3a37  topics: multimodal, tool use
 ```
 
-## License
+The OpenClaw command name is `/aminer-rec5`.
 
-[MIT](LICENSE)
+## ✅ What you get out of the box
+
+- 💬 **Natural-language-first** — one sentence is enough
+- 🔍 **arXiv + AMiner enrichment** — broad recall, deep metadata
+- 👤 **Scholar-aware cold start** — ranking tuned to your real profile
+- 📝 **Structured summaries** — every paper gets a plain-language summary *and* a recommendation reason
+- 📄 **CLI output** — Markdown / JSON, version-control friendly
+- 🐧 **Graceful degradation** — missing optional components never break the run
+- 🚦 **Input guardrails** — sensible limits keep runs safe and reproducible
+
+## 📂 Repository layout
+
+| Path | Purpose |
+|---|---|
+| `SKILL.md` / `SKILL_zh.md` | OpenClaw skill contract |
+| `pyproject.toml` | install metadata + `aminer-rec` console command |
+| `aminer_rec/` | package-level CLI dispatcher |
+| `scripts/recommend.py` | standalone CLI entrypoint |
+| `scripts/handle_trigger.py` | Feishu / OpenClaw trigger entrypoint |
+| `scripts/` | core pipeline: parsing, profile, retrieval, summarization, rendering, dispatch |
+| `config.example.yaml` | safe example configuration |
+
+## 🛠️ Interface contract & guardrails
+
+Public entrypoints:
+
+```bash
+aminer-rec recommend --base-dir . --topics "multimodal agents, tool use"
+python3 scripts/recommend.py      --base-dir . --topics "multimodal agents, tool use"
+python3 scripts/handle_trigger.py --base-dir . --text "<message>"
+```
+
+- `aminer_user_id` — 24-character hex string
+- `topics` — up to 8, ≤ 80 chars each
+- `paper_titles` — up to 8, ≤ 300 chars each
+- `scholar_name` ≤ 80 chars · `scholar_org` ≤ 160 chars · `free_text` ≤ 600 chars
+- `papers_file` — JSON only, must stay inside the skill directory
+- `language_sort` — `zh` or `en`
+- `start_year` / `end_year` — integers in 1900–2100
+
+Routing fields are truncated to safe lengths before dispatch.
+
+## 🔌 Optional internal hooks
+
+Missing any of these? The pipeline still runs — some features just degrade gracefully.
+
+- `DATACENTER_SEGMENTATION_URL` — better query segmentation
+- `RECSYS_NEXT_DIR` — internal UID profile lookup
+- `OPENCLAW_HOME` / `OPENCLAW_CONFIG_PATH` / `OPENCLAW_SESSIONS_PATH` — override local OpenClaw paths
+
+## 📄 License
+
+[MIT](LICENSE) — read papers, ship ideas, attribute kindly.
