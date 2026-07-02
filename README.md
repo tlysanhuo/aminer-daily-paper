@@ -41,23 +41,39 @@ Pick whichever feels lazier:
 
 Both paths collapse into a single `ResearchProfile`, then flow through the same pipeline:
 
+```mermaid
+flowchart LR
+    A1["topics / free text"] --> B["build ResearchProfile"]
+    A2["scholar / id / seed papers"] --> B
+    B --> C["arXiv retrieval"]
+    C --> D["AMiner enrichment"]
+    D --> E["profile-aware ranking"]
+    E --> F["LLM summary + recommendation reason"]
+    F --> G["Markdown · JSON"]
+    F --> H["Feishu cards\n(optional)"]
 ```
-                  ┌─────────────────────────────────────────────┐
-  topics / text ──▶│                                             │
-                  │            build ResearchProfile             │
-  scholar / id  ──▶│                                             │
-                  └──────────────────────┬──────────────────────┘
-                                         │
-          ┌──────────────────────────────▼──────────────────────────────┐
-          │   arXiv retrieval   ▶   AMiner enrichment   ▶   ranking      │
-          └──────────────────────────────┬──────────────────────────────┘
-                                         │
-          ┌──────────────────────────────▼──────────────────────────────┐
-          │   LLM summaries + recommendation reasons   ▶   rendering     │
-          └──────────────────────────────┬──────────────────────────────┘
-                                         │
-                          Markdown · JSON · (optional) Feishu cards
+
+## 👀 What the output looks like
+
+Run it once, and `outputs_cli/recommendation.md` is a clean reading list — every paper carries a summary and a one-line reason it was picked for you. Here's the shape of a single entry (the renderer emits Chinese labels by default):
+
+```markdown
+为你推荐 5 篇相关论文（研究方向：multimodal agents / tool use）
+
+---
+
+**1. [ToolGen: Unified Tool Retrieval and Generation...](https://www.aminer.cn/pub/5f...)**
+
+年份：2024 | 关键词：LLM · tool use · agents
+
+作者：X. Y. Zhang、A. B. Li、C. Wang et al.
+
+推荐理由：与你的 "tool use" 方向高度吻合，提出统一工具检索与生成的框架，正好补你最近关注的能力缺口。
+
+本文提出 ToolGen，将工具的检索与调用统一进一个生成式框架……（摘要正文）
 ```
+
+The companion `recommendation_result.json` carries the full structured payload — `title`, `keywords`, `authors`, `famous_authors`, `summary`, `recommendation_reason`, `aminer_paper_url`, and more — so you can feed it into anything downstream.
 
 ## 🚀 Quick Start
 
